@@ -3,7 +3,6 @@ package ranking
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
 	"math/rand"
 	"os"
 	"time"
@@ -354,46 +353,42 @@ func (rt *RankTree) QueryByRank(rank int32) *RankInfo {
 }
 
 // 从dump加载排名模块
-func LoadRanking(filename string) *RankTree {
+func LoadRanking(filename string) (*RankTree, error) {
 	f, err := os.OpenFile(filename, os.O_RDONLY, 0666)
 	if err != nil {
-		log.Println("Open map file", err.Error())
-		return nil
+		return nil, err
 	}
 	defer f.Close()
 	info, _ := f.Stat()
 	raw := make([]byte, info.Size())
 	_, err = f.Read(raw)
 	if err != nil {
-		log.Fatalln("Read map file, err", err.Error())
-		return nil
+		return nil, err
 	}
 	rt := new(RankTree)
 	enc := gob.NewDecoder(bytes.NewReader(raw))
 	err = enc.Decode(rt)
 	if err != nil {
-		log.Fatalln("Load Ranking error:", err.Error())
+		return nil, err
 	}
-	return rt
+	return rt, nil
 }
 
 // dump排名模块
-func SaveRanking(rt *RankTree, filename string) bool {
+func SaveRanking(rt *RankTree, filename string) (bool, error) {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
-		log.Fatalln(err.Error())
-		return false
+		return false, err
 	}
 	defer f.Close()
 	buffer := new(bytes.Buffer)
 	enc := gob.NewEncoder(buffer)
 	err = enc.Encode(rt)
 	if err != nil {
-		log.Println("Dump encode err:", err.Error())
-		return false
+		return false, err
 	}
 	f.Write(buffer.Bytes())
-	return true
+	return true, nil
 }
 
 type DbRankInfo struct {
