@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"os"
 	"time"
+
+	"github.com/zxfonline/buffpool"
 )
 
 // 跳跃表最大层数
@@ -360,7 +362,8 @@ func LoadRanking(filename string) (*RankTree, error) {
 	}
 	defer f.Close()
 	info, _ := f.Stat()
-	raw := make([]byte, info.Size())
+	raw := buffpool.BufGet(info.Size())
+	defer buffpool.BufPut(raw)
 	_, err = f.Read(raw)
 	if err != nil {
 		return nil, err
