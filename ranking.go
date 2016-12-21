@@ -1,3 +1,6 @@
+// Copyright 2016 zxfonline@sina.com. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 package ranking
 
 import (
@@ -362,7 +365,7 @@ func LoadRanking(filename string) (*RankTree, error) {
 	}
 	defer f.Close()
 	info, _ := f.Stat()
-	raw := buffpool.BufGet(info.Size())
+	raw := buffpool.BufGet(int(info.Size()))
 	defer buffpool.BufPut(raw)
 	_, err = f.Read(raw)
 	if err != nil {
