@@ -1,6 +1,7 @@
 // Copyright 2016 zxfonline@sina.com. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
 package ranking
 
 import (
@@ -318,7 +319,7 @@ func (rt *RankTree) RemoveRankInfo(uid int64) bool {
 
 // 更新排名信息
 func (rt *RankTree) UpdateRankInfo(uid int64, val int64, timestamp int64) {
-	if info := rt.EntryMapping[uid]; info == nil || info.Val != val {
+	if info := rt.EntryMapping[uid]; info == nil || info.Val < val {
 		rt.RemoveRankInfo(uid)
 		rt.AddRankInfo(uid, val, timestamp)
 	}
