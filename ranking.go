@@ -7,8 +7,8 @@ package ranking
 import (
 	"bytes"
 	"encoding/gob"
+	"io/ioutil"
 	"math/rand"
-	"os"
 	"sync"
 	"time"
 )
@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	_RTS  map[int16]*RankTree
+	RTS   = make(map[int16]*RankTree)
 	_Lock sync.RWMutex
 )
 
@@ -413,14 +413,7 @@ func (rt *RankTree) QueryByRank(rank int32) *RankInfo {
 
 // 从dump加载排名模块
 func LoadRanking(filename string) (*RankTree, error) {
-	f, err := os.OpenFile(filename, os.O_RDONLY, 0666)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	info, _ := f.Stat()
-	raw := make([]byte, info.Size())
-	_, err = f.Read(raw)
+	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -434,20 +427,13 @@ func LoadRanking(filename string) (*RankTree, error) {
 }
 
 // dump排名模块
-func SaveRanking(rt *RankTree, filename string) (bool, error) {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
+func SaveRanking(rt *RankTree, filename string) error {
 	buffer := new(bytes.Buffer)
 	enc := gob.NewEncoder(buffer)
-	err = enc.Encode(rt)
-	if err != nil {
-		return false, err
+	if err := enc.Encode(rt); err != nil {
+		return err
 	}
-	f.Write(buffer.Bytes())
-	return true, nil
+	return ioutil.WriteFile(filename, buffer.Bytes(), 0666)
 }
 
 type DbRankInfo struct {
@@ -480,7 +466,7 @@ func LoadRankTrees(infos []DbRankInfo) map[int16]*RankTree {
 func Save() []DbRankInfo {
 	_Lock.RLock()
 	defer _Lock.RUnlock()
-	return SaveRankTrees(_RTS)
+	return SaveRankTrees(RTS)
 }
 
 // dump排名模块
@@ -503,9 +489,9 @@ func SaveRankTrees(rts map[int16]*RankTree) []DbRankInfo {
 func GetRankTree(rtype int16) *RankTree {
 	_Lock.Lock()
 	defer _Lock.Unlock()
-	if rt, ok := _RTS[rtype]; !ok {
+	if rt, ok := RTS[rtype]; !ok {
 		rt = NewRankTree()
-		_RTS[rtype] = rt
+		RTS[rtype] = rt
 		return rt
 	} else {
 		return rt
@@ -515,6 +501,6 @@ func GetRankTree(rtype int16) *RankTree {
 func ResetRankTree(rtype int16) {
 	_Lock.Lock()
 	defer _Lock.Unlock()
-	delete(_RTS, rtype)
-	_RTS[rtype] = NewRankTree()
+	delete(RTS, rtype)
+	RTS[rtype] = NewRankTree()
 }
