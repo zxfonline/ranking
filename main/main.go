@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"misc/ranking"
 	"time"
+
+	"github.com/zxfonline/ranking"
 )
 
 var (
@@ -26,7 +27,7 @@ func main() {
 		panic(err)
 	}
 
-	ranking.ResetRankTree(1)
+	ranking.ResetRankTree(1, nil)
 
 	rt, err = ranking.LoadRanking("./rank1.txt")
 	if err != nil {

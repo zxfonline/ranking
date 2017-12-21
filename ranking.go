@@ -498,9 +498,13 @@ func GetRankTree(rtype int16) *RankTree {
 	}
 }
 
-func ResetRankTree(rtype int16) {
+func ResetRankTree(rtype int16, rank *RankTree) {
 	_Lock.Lock()
 	defer _Lock.Unlock()
 	delete(RTS, rtype)
-	RTS[rtype] = NewRankTree()
+	if rank == nil {
+		RTS[rtype] = NewRankTree()
+	} else {
+		RTS[rtype] = rank
+	}
 }
