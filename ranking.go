@@ -9,16 +9,25 @@ import (
 	"encoding/gob"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
-
-	"github.com/zxfonline/buffpool"
 )
 
-// 跳跃表最大层数
-const SKIPLIST_MAXLEVEL = 32
+const (
+	// 跳跃表最大层数
+	SKIPLIST_MAXLEVEL = 32
+	// 随机概率
+	SKIPLIST_P = 0.25
+)
 
-// 随机概率
-const SKIPLIST_P = 0.25
+var (
+	_RTS  map[int16]*RankTree
+	_Lock sync.RWMutex
+)
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type RankInfo struct {
 	Id        int64
@@ -91,7 +100,6 @@ func newSkiplist() *skiplist {
 
 func randomLevel() int32 {
 	lvl := int32(1)
-	rand.Seed(time.Now().UnixNano())
 	for rand.Float32() < SKIPLIST_P && lvl < SKIPLIST_MAXLEVEL {
 		lvl++
 	}
@@ -278,6 +286,7 @@ func (sl *skiplist) foreach(do func(int64, interface{})) {
 type RankTree struct {
 	Sl           *skiplist
 	EntryMapping map[int64]*RankInfo
+	lock         sync.RWMutex
 }
 
 func NewRankTree() *RankTree {
@@ -287,28 +296,10 @@ func NewRankTree() *RankTree {
 	return rt
 }
 
-// 添加新排名信息
-func (rt *RankTree) AddRankInfo(uid int64, val int64, timestamp int64) {
-	var info *RankInfo
-	if info = rt.EntryMapping[uid]; info != nil {
-		if info.Val == val {
-			return
-		}
-		rt.Sl.remove(info.Val, info)
-		info.Val = val
-		info.Timestamp = timestamp
-	} else {
-		info = new(RankInfo)
-		info.Id = uid
-		info.Val = val
-		info.Timestamp = timestamp
-	}
-	rt.Sl.insert(info.Val, info)
-	rt.EntryMapping[uid] = info
-}
-
 // 删除排名信息
 func (rt *RankTree) RemoveRankInfo(uid int64) bool {
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
 	if info := rt.EntryMapping[uid]; info != nil {
 		rt.Sl.remove(info.Val, info)
 		delete(rt.EntryMapping, uid)
@@ -317,16 +308,76 @@ func (rt *RankTree) RemoveRankInfo(uid int64) bool {
 	return false
 }
 
+// 添加新排名信息
+func (rt *RankTree) AddRankInfo(uid int64, val int64, timestamp int64) {
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+	if info := rt.EntryMapping[uid]; info == nil {
+		info = new(RankInfo)
+		info.Id = uid
+
+		info.Val = val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
+
+		rt.EntryMapping[uid] = info
+	} else if info.Val != val {
+		rt.Sl.remove(info.Val, info)
+
+		info.Val = val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
+	}
+}
+
 // 更新排名信息
 func (rt *RankTree) UpdateRankInfo(uid int64, val int64, timestamp int64) {
-	if info := rt.EntryMapping[uid]; info == nil || info.Val < val {
-		rt.RemoveRankInfo(uid)
-		rt.AddRankInfo(uid, val, timestamp)
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+	if info := rt.EntryMapping[uid]; info == nil {
+		info = new(RankInfo)
+		info.Id = uid
+
+		info.Val = val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
+
+		rt.EntryMapping[uid] = info
+	} else if info.Val != val {
+		rt.Sl.remove(info.Val, info)
+
+		info.Val = val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
+	}
+}
+
+// 更新排名信息
+func (rt *RankTree) IncrRankInfo(uid int64, val int64, timestamp int64) {
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+	if info := rt.EntryMapping[uid]; info == nil {
+		info = new(RankInfo)
+		info.Id = uid
+
+		info.Val = val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
+
+		rt.EntryMapping[uid] = info
+	} else {
+		rt.Sl.remove(info.Val, info)
+
+		info.Val += val
+		info.Timestamp = timestamp
+		rt.Sl.insert(info.Val, info)
 	}
 }
 
 // 查询用户排名
 func (rt *RankTree) QueryRankInfo(uid int64) *RankInfo {
+	rt.lock.RLock()
+	defer rt.lock.RUnlock()
 	var info *RankInfo
 	if info = rt.EntryMapping[uid]; info == nil {
 		return nil
@@ -354,6 +405,8 @@ func (rt *RankTree) QueryByRank(rank int32) *RankInfo {
 	key, val := rt.Sl.searchByRank(rank)
 	if key < 0 {
 		return nil
+	} else if val != nil {
+		val.Rank = rank
 	}
 	return val
 }
@@ -366,8 +419,7 @@ func LoadRanking(filename string) (*RankTree, error) {
 	}
 	defer f.Close()
 	info, _ := f.Stat()
-	raw := buffpool.BufGet(int(info.Size()))
-	defer buffpool.BufPut(raw)
+	raw := make([]byte, info.Size())
 	_, err = f.Read(raw)
 	if err != nil {
 		return nil, err
@@ -405,9 +457,9 @@ type DbRankInfo struct {
 	Timestamp int64
 }
 
-var (
-	RTS map[int16]*RankTree
-)
+func Load(infos []DbRankInfo) {
+	LoadRankTrees(infos)
+}
 
 // 从dump加载排名模块
 func LoadRankTrees(infos []DbRankInfo) map[int16]*RankTree {
@@ -425,13 +477,19 @@ func LoadRankTrees(infos []DbRankInfo) map[int16]*RankTree {
 	return rts
 }
 
+func Save() []DbRankInfo {
+	_Lock.RLock()
+	defer _Lock.RUnlock()
+	return SaveRankTrees(_RTS)
+}
+
 // dump排名模块
 func SaveRankTrees(rts map[int16]*RankTree) []DbRankInfo {
 	infos := make([]DbRankInfo, 0)
-	for Type, rt := range rts {
+	for t, rt := range rts {
 		for _, entry := range rt.EntryMapping {
 			info := DbRankInfo{
-				Type:      Type,
+				Type:      t,
 				Id:        entry.Id,
 				Val:       entry.Val,
 				Timestamp: entry.Timestamp,
@@ -442,28 +500,21 @@ func SaveRankTrees(rts map[int16]*RankTree) []DbRankInfo {
 	return infos
 }
 
-func Load(infos []DbRankInfo) {
-	RTS = LoadRankTrees(infos)
-	if RTS == nil {
-		RTS = make(map[int16]*RankTree)
-		SaveRankTrees(RTS)
-	}
-}
-
-func Save() []DbRankInfo {
-	return SaveRankTrees(RTS)
-}
-
 func GetRankTree(rtype int16) *RankTree {
-	rt, ok := RTS[rtype]
-	if !ok {
+	_Lock.Lock()
+	defer _Lock.Unlock()
+	if rt, ok := _RTS[rtype]; !ok {
 		rt = NewRankTree()
-		RTS[rtype] = rt
+		_RTS[rtype] = rt
+		return rt
+	} else {
+		return rt
 	}
-	return rt
 }
 
 func ResetRankTree(rtype int16) {
-	delete(RTS, rtype)
-	RTS[rtype] = NewRankTree()
+	_Lock.Lock()
+	defer _Lock.Unlock()
+	delete(_RTS, rtype)
+	_RTS[rtype] = NewRankTree()
 }
