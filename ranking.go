@@ -417,11 +417,14 @@ func LoadRanking(filename string) (*RankTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	rt := new(RankTree)
+	rt := NewRankTree()
 	enc := gob.NewDecoder(bytes.NewReader(raw))
 	err = enc.Decode(rt)
 	if err != nil {
 		return nil, err
+	}
+	for _, info := range rt.EntryMapping {
+		rt.Sl.insert(info.Val, info)
 	}
 	return rt, nil
 }
@@ -443,12 +446,12 @@ type DbRankInfo struct {
 	Timestamp int64
 }
 
-func Load(infos []DbRankInfo) {
+func Load(infos []*DbRankInfo) {
 	LoadRankTrees(infos)
 }
 
 // 从dump加载排名模块
-func LoadRankTrees(infos []DbRankInfo) map[int16]*RankTree {
+func LoadRankTrees(infos []*DbRankInfo) map[int16]*RankTree {
 	// construct ranktrees
 	rts := make(map[int16]*RankTree)
 	var rt *RankTree
@@ -463,18 +466,18 @@ func LoadRankTrees(infos []DbRankInfo) map[int16]*RankTree {
 	return rts
 }
 
-func Save() []DbRankInfo {
+func Save() []*DbRankInfo {
 	_Lock.RLock()
 	defer _Lock.RUnlock()
 	return SaveRankTrees(RTS)
 }
 
 // dump排名模块
-func SaveRankTrees(rts map[int16]*RankTree) []DbRankInfo {
-	infos := make([]DbRankInfo, 0)
+func SaveRankTrees(rts map[int16]*RankTree) []*DbRankInfo {
+	infos := make([]*DbRankInfo, 0)
 	for t, rt := range rts {
 		for _, entry := range rt.EntryMapping {
-			info := DbRankInfo{
+			info := &DbRankInfo{
 				Type:      t,
 				Id:        entry.Id,
 				Val:       entry.Val,
