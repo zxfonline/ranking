@@ -24,7 +24,7 @@ func init() {
 func TestAddQueryRankInfo(t *testing.T) {
 	rt := NewRankTree()
 	for uid := int64(1); uid <= maxUID; uid++ {
-		rt.AddRankInfo(uid, maxUID-uid+1, time.Now().UTC().Unix())
+		rt.AddRankInfo(uid, maxUID-uid+1, time.Now().UTC().UnixNano())
 	}
 	for uid := int64(1); uid <= maxUID; uid++ {
 		info := rt.QueryRankInfo(uid)
@@ -39,11 +39,11 @@ func TestUpdateRankInfo(t *testing.T) {
 	rt := NewRankTree()
 	for uid := int64(1); uid <= maxUID; uid++ {
 		val := randInt(int64(0), maxVal-int64(1))
-		rt.AddRankInfo(uid, val, time.Now().UTC().Unix())
+		rt.AddRankInfo(uid, val, time.Now().UTC().UnixNano())
 	}
 	for uid := int64(1); uid <= maxUID; uid++ {
 		newVal := uid
-		rt.UpdateRankInfo(uid, maxUID-newVal+1, time.Now().UTC().Unix())
+		rt.UpdateRankInfo(uid, maxUID-newVal+1, time.Now().UTC().UnixNano())
 	}
 	for uid := int64(1); uid <= maxUID; uid++ {
 		info := rt.QueryRankInfo(int64(uid))
@@ -59,7 +59,7 @@ func BenchmarkAddRankInfo(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		uid := randInt(1, maxUID)
 		val := randInt(0, maxVal)
-		rt.AddRankInfo(int64(uid), val, time.Now().UTC().Unix())
+		rt.AddRankInfo(int64(uid), val, time.Now().UTC().UnixNano())
 	}
 }
 

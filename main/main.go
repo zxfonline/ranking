@@ -19,7 +19,8 @@ func init() {
 func main() {
 	rt := ranking.GetRankTree(1)
 	for uid := int64(1); uid <= maxUID; uid++ {
-		rt.AddRankInfo(uid, uid, time.Now().UTC().Unix())
+		time.Sleep(time.Nanosecond)
+		rt.AddRankInfo(uid, uid, time.Now().UTC().UnixNano())
 	}
 
 	err := ranking.SaveRanking(rt, "./rank1.txt")
@@ -27,12 +28,24 @@ func main() {
 		panic(err)
 	}
 
-	ranking.ResetRankTree(1, nil)
+	fmt.Println("====QueryByRank=====")
+	for rank := int32(1); rank <= int32(maxUID); rank++ {
+		info := rt.QueryByRank(rank)
+		fmt.Printf("%+v\n", info)
+	}
+	fmt.Println("====QueryRankInfo=====")
+	for uid := int64(1); uid <= maxUID; uid++ {
+		info := rt.QueryRankInfo(uid)
+		fmt.Printf("%+v\n", info)
+	}
 
 	rt, err = ranking.LoadRanking("./rank1.txt")
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("=====================")
+	ranking.ResetRankTree(1, rt)
+	rt = ranking.GetRankTree(1)
 	fmt.Println("====QueryByRank=====")
 	for rank := int32(1); rank <= int32(maxUID); rank++ {
 		info := rt.QueryByRank(rank)

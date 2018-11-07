@@ -284,14 +284,14 @@ func (sl *skiplist) foreach(do func(int64, interface{})) {
 }
 
 type RankTree struct {
-	Sl           *skiplist
+	sl           *skiplist
 	EntryMapping map[int64]*RankInfo
 	lock         sync.RWMutex
 }
 
 func NewRankTree() *RankTree {
 	rt := new(RankTree)
-	rt.Sl = newSkiplist()
+	rt.sl = newSkiplist()
 	rt.EntryMapping = make(map[int64]*RankInfo)
 	return rt
 }
@@ -301,7 +301,7 @@ func (rt *RankTree) RemoveRankInfo(uid int64) bool {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	if info := rt.EntryMapping[uid]; info != nil {
-		rt.Sl.remove(info.Val, info)
+		rt.sl.remove(info.Val, info)
 		delete(rt.EntryMapping, uid)
 		return true
 	}
@@ -318,15 +318,15 @@ func (rt *RankTree) AddRankInfo(uid int64, val int64, timestamp int64) {
 
 		info.Val = val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 
 		rt.EntryMapping[uid] = info
 	} else if info.Val != val {
-		rt.Sl.remove(info.Val, info)
+		rt.sl.remove(info.Val, info)
 
 		info.Val = val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 	}
 }
 
@@ -340,15 +340,15 @@ func (rt *RankTree) UpdateRankInfo(uid int64, val int64, timestamp int64) {
 
 		info.Val = val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 
 		rt.EntryMapping[uid] = info
 	} else if info.Val != val {
-		rt.Sl.remove(info.Val, info)
+		rt.sl.remove(info.Val, info)
 
 		info.Val = val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 	}
 }
 
@@ -362,15 +362,15 @@ func (rt *RankTree) IncrRankInfo(uid int64, val int64, timestamp int64) {
 
 		info.Val = val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 
 		rt.EntryMapping[uid] = info
 	} else {
-		rt.Sl.remove(info.Val, info)
+		rt.sl.remove(info.Val, info)
 
 		info.Val += val
 		info.Timestamp = timestamp
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 	}
 }
 
@@ -382,8 +382,9 @@ func (rt *RankTree) QueryRankInfo(uid int64) *RankInfo {
 	if info = rt.EntryMapping[uid]; info == nil {
 		return nil
 	}
-	info.Rank = rt.Sl.rank(info.Val, info) + 1
-	return info
+	val := copyValue(info)
+	val.Rank = rt.sl.rank(info.Val, info) + 1
+	return val
 }
 
 // 查询指定范围排名
@@ -394,21 +395,24 @@ func (rt *RankTree) QueryByRankRange(min, max int32) []*RankInfo {
 	if min <= 0 {
 		min = 1
 	}
-	if max > rt.Sl.Length {
-		max = rt.Sl.Length
+	if max > rt.sl.Length {
+		max = rt.sl.Length
 	}
-	return rt.Sl.searchByRankRange(min, max)
+	return rt.sl.searchByRankRange(min, max)
 }
 
 // 根据排名查询信息
 func (rt *RankTree) QueryByRank(rank int32) *RankInfo {
-	key, val := rt.Sl.searchByRank(rank)
+	key, info := rt.sl.searchByRank(rank)
 	if key < 0 {
 		return nil
-	} else if val != nil {
+	} else if info != nil {
+		val := copyValue(info)
 		val.Rank = rank
+		return val
+	} else {
+		return nil
 	}
-	return val
 }
 
 // 从dump加载排名模块
@@ -424,7 +428,7 @@ func LoadRanking(filename string) (*RankTree, error) {
 		return nil, err
 	}
 	for _, info := range rt.EntryMapping {
-		rt.Sl.insert(info.Val, info)
+		rt.sl.insert(info.Val, info)
 	}
 	return rt, nil
 }
