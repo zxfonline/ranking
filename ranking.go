@@ -268,8 +268,8 @@ func (sl *skiplist) searchByRankRange(min, max int32) []*RankInfo {
 
 	rank := min
 	for i := st; rank <= max && i != nil; i = i.Level[0].Forward {
-		i.Val.Rank = rank
 		val := copyValue(i.Val)
+		val.Rank = rank
 		res = append(res, val)
 		rank++
 	}
