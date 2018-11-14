@@ -43,7 +43,7 @@ func TestUpdateRankInfo(t *testing.T) {
 	}
 	for uid := int64(1); uid <= maxUID; uid++ {
 		newVal := uid
-		rt.UpdateRankInfo(uid, maxUID-newVal+1, time.Now().UTC().UnixNano())
+		rt.AddRankInfo(uid, maxUID-newVal+1, time.Now().UTC().UnixNano())
 	}
 	for uid := int64(1); uid <= maxUID; uid++ {
 		info := rt.QueryRankInfo(int64(uid))
@@ -77,6 +77,6 @@ func BenchmarkUpdateRankInfo(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		uid := randInt(1, maxUID)
 		newval = randInt(0, maxVal)
-		rt.UpdateRankInfo(int64(uid), newval, time.Now().UTC().Unix())
+		rt.AddRankInfo(int64(uid), newval, time.Now().UTC().Unix())
 	}
 }
