@@ -10,6 +10,7 @@ import (
 
 var (
 	maxUID int64 = 10
+	_path        = "output/rank/rank.db"
 )
 
 func init() {
@@ -17,15 +18,18 @@ func init() {
 }
 
 func main() {
-	rt := ranking.GetRankTree(1)
-	for uid := int64(1); uid <= maxUID; uid++ {
-		time.Sleep(time.Nanosecond)
-		rt.AddRankInfo(uid, uid, time.Now().UTC().UnixNano())
-	}
+	rt, err := ranking.LoadRanking(_path)
+	if err != nil { //初始化数据
+		rt = ranking.GetRankTree(1)
+		for uid := int64(1); uid <= maxUID; uid++ {
+			time.Sleep(time.Nanosecond)
+			rt.AddRankInfo(uid, uid, time.Now().UTC().UnixNano())
+		}
 
-	err := ranking.SaveRanking(rt, "./rank1.txt")
-	if err != nil {
-		panic(err)
+		err := ranking.SaveRanking(rt, _path)
+		if err != nil {
+			panic(fmt.Errorf("init rank err,path:%s,err:%v.", _path, err))
+		}
 	}
 
 	fmt.Println("====QueryByRank=====")
@@ -39,7 +43,7 @@ func main() {
 		fmt.Printf("%+v\n", info)
 	}
 
-	rt, err = ranking.LoadRanking("./rank1.txt")
+	rt, err = ranking.LoadRanking(_path)
 	if err != nil {
 		panic(err)
 	}

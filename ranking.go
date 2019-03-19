@@ -1,7 +1,3 @@
-// Copyright 2016 zxfonline@sina.com. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package ranking
 
 import (
@@ -9,8 +5,11 @@ import (
 	"encoding/gob"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/zxfonline/fileutil"
 )
 
 const (
@@ -413,12 +412,18 @@ func LoadRanking(filename string) (*RankTree, error) {
 
 //SaveRanking dump排名模块
 func SaveRanking(rt *RankTree, filename string) error {
+	f, err := fileutil.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileutil.DefaultFileMode)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 	buffer := new(bytes.Buffer)
 	enc := gob.NewEncoder(buffer)
 	if err := enc.Encode(rt); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, buffer.Bytes(), 0666)
+	_, err = f.Write(buffer.Bytes())
+	return err
 }
 
 type DbRankInfo struct {
